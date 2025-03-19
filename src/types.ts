@@ -13,8 +13,6 @@ export interface User {
 export interface FirewallRule {
   id: number;
   sourceIp: string;
-  port: number;
-  protocol: "tcp" | "udp" | "icmp";
   description: string;
   enabled: boolean;
   createdAt: string;

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Plus, Trash2, Save, RefreshCw, Shield, AlertTriangle, Search, Terminal } from "lucide-react";
+import { Plus, Trash2, Save, RefreshCw, Shield, AlertTriangle, Search } from "lucide-react";
 import { FirewallRule } from "@/types";
 import { mockFirewallRules } from "@/lib/mock-data";
 import {
@@ -20,25 +21,21 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 
 export default function Firewall() {
-  const [rules, setRules] = useState<FirewallRule[]>(mockFirewallRules);
+  const [rules, setRules] = useState<FirewallRule[]>(mockFirewallRules.map(rule => ({
+    id: rule.id,
+    sourceIp: rule.sourceIp,
+    description: rule.description,
+    enabled: rule.enabled,
+    createdAt: rule.createdAt,
+    updatedAt: rule.updatedAt
+  })));
   const [editingRule, setEditingRule] = useState<FirewallRule | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isFirewallActive, setIsFirewallActive] = useState(true);
-  const [commandOutput, setCommandOutput] = useState("");
   const [isRunningCommand, setIsRunningCommand] = useState(false);
-  const [showCommandDialog, setShowCommandDialog] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const isReadOnly = user?.role === "viewer";
@@ -55,7 +52,6 @@ export default function Firewall() {
     }
 
     setIsRunningCommand(true);
-    setCommandOutput("");
     
     // Simulate backend API call to execute firewalld command
     return new Promise<void>((resolve, reject) => {
@@ -67,8 +63,6 @@ export default function Firewall() {
           output = `success: IP address added to firewalld\nRule successfully added\n${command}`;
         } else if (command.includes("--remove-source")) {
           output = `success: IP address removed from firewalld\nRule successfully removed\n${command}`;
-        } else if (command.includes("--add-port")) {
-          output = `success: Port added to firewalld\nRule successfully added\n${command}`;
         } else if (command.includes("--reload")) {
           output = "success: Firewall successfully reloaded";
         } else {
@@ -77,7 +71,6 @@ export default function Firewall() {
           return;
         }
         
-        setCommandOutput(output);
         setIsRunningCommand(false);
         
         toast({
@@ -94,8 +87,6 @@ export default function Firewall() {
     const newRule: FirewallRule = {
       id: Math.max(0, ...rules.map((r) => r.id)) + 1,
       sourceIp: "",
-      port: 22,
-      protocol: "tcp",
       description: "",
       enabled: true,
       createdAt: new Date().toISOString(),
@@ -122,16 +113,6 @@ export default function Firewall() {
       return;
     }
 
-    // Validate port number
-    if (editingRule.port < 1 || editingRule.port > 65535) {
-      toast({
-        title: "Invalid Port",
-        description: "Port must be between 1 and 65535",
-        variant: "destructive",
-      });
-      return;
-    }
-
     const updatedRule = {
       ...editingRule,
       updatedAt: new Date().toISOString(),
@@ -145,7 +126,7 @@ export default function Firewall() {
     let successMessage = "";
     
     if (updatedRule.enabled) {
-      command = `firewall-cmd --permanent --zone=public --add-source=${updatedRule.sourceIp} --add-port=${updatedRule.port}/${updatedRule.protocol}`;
+      command = `firewall-cmd --permanent --zone=public --add-source=${updatedRule.sourceIp}`;
       successMessage = isNewRule 
         ? `New firewall rule for ${updatedRule.sourceIp} has been added to firewalld.`
         : `Firewall rule for ${updatedRule.sourceIp} has been updated in firewalld.`;
@@ -231,7 +212,7 @@ export default function Firewall() {
     let successMessage = "";
     
     if (enabled) {
-      command = `firewall-cmd --permanent --zone=public --add-source=${ruleToToggle.sourceIp} --add-port=${ruleToToggle.port}/${ruleToToggle.protocol}`;
+      command = `firewall-cmd --permanent --zone=public --add-source=${ruleToToggle.sourceIp}`;
       successMessage = `Firewall rule for ${ruleToToggle.sourceIp} has been enabled in firewalld.`;
     } else {
       command = `firewall-cmd --permanent --zone=public --remove-source=${ruleToToggle.sourceIp}`;
@@ -375,8 +356,6 @@ export default function Firewall() {
                   <TableRow>
                     <TableHead className="w-[120px]">Status</TableHead>
                     <TableHead>Source IP</TableHead>
-                    <TableHead>Port</TableHead>
-                    <TableHead>Protocol</TableHead>
                     <TableHead className="hidden md:table-cell">Description</TableHead>
                     <TableHead className="hidden md:table-cell">Last Updated</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -385,7 +364,7 @@ export default function Firewall() {
                 <TableBody>
                   {filteredRules.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
                         No rules found.
                       </TableCell>
                     </TableRow>
@@ -402,8 +381,6 @@ export default function Firewall() {
                           />
                         </TableCell>
                         <TableCell className="font-medium">{rule.sourceIp}</TableCell>
-                        <TableCell>{rule.port}</TableCell>
-                        <TableCell>{rule.protocol.toUpperCase()}</TableCell>
                         <TableCell className="hidden md:table-cell">
                           {rule.description || "-"}
                         </TableCell>
@@ -450,12 +427,12 @@ export default function Firewall() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>
-                  {editingRule && editingRule.id in rules
+                  {editingRule && rules.some(r => r.id === editingRule.id)
                     ? "Edit Firewall Rule"
                     : "Add Firewall Rule"}
                 </DialogTitle>
                 <DialogDescription>
-                  Configure the firewall rule details below.
+                  Configure the firewall rule details below. This rule will allow all traffic from the specified IP address.
                 </DialogDescription>
               </DialogHeader>
               {editingRule && (
@@ -476,48 +453,6 @@ export default function Firewall() {
                       placeholder="192.168.1.0/24"
                       className="col-span-3"
                     />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="port" className="text-right">
-                      Port
-                    </Label>
-                    <Input
-                      id="port"
-                      type="number"
-                      value={editingRule.port}
-                      onChange={(e) =>
-                        setEditingRule({
-                          ...editingRule,
-                          port: parseInt(e.target.value),
-                        })
-                      }
-                      min={1}
-                      max={65535}
-                      className="col-span-3"
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="protocol" className="text-right">
-                      Protocol
-                    </Label>
-                    <Select
-                      value={editingRule.protocol}
-                      onValueChange={(value) =>
-                        setEditingRule({
-                          ...editingRule,
-                          protocol: value as "tcp" | "udp" | "icmp",
-                        })
-                      }
-                    >
-                      <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Select protocol" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="tcp">TCP</SelectItem>
-                        <SelectItem value="udp">UDP</SelectItem>
-                        <SelectItem value="icmp">ICMP</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="description" className="text-right">
@@ -563,7 +498,7 @@ export default function Firewall() {
                   Cancel
                 </Button>
                 <Button onClick={handleSaveRule}>
-                  {editingRule && editingRule.id in rules ? "Update" : "Add"} Rule
+                  {editingRule && rules.some(r => r.id === editingRule.id) ? "Update" : "Add"} Rule
                 </Button>
               </DialogFooter>
             </DialogContent>
