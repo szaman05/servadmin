@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Plus, Trash2, Save, RefreshCw, Shield, AlertTriangle, Search } from "lucide-react";
+import { Plus, Trash2, Save, RefreshCw, Shield, AlertTriangle, Search, Terminal } from "lucide-react";
 import { FirewallRule } from "@/types";
 import { mockFirewallRules } from "@/lib/mock-data";
 import {
@@ -30,15 +29,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function Firewall() {
   const [rules, setRules] = useState<FirewallRule[]>(mockFirewallRules);
   const [editingRule, setEditingRule] = useState<FirewallRule | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isFirewallActive, setIsFirewallActive] = useState(true);
+  const [commandOutput, setCommandOutput] = useState("");
+  const [isRunningCommand, setIsRunningCommand] = useState(false);
+  const [showCommandDialog, setShowCommandDialog] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const isReadOnly = user?.role === "viewer";
+  const canExecuteCommands = user?.role === "admin";
 
   const handleAddRule = () => {
     const newRule: FirewallRule = {
@@ -56,6 +60,52 @@ export default function Firewall() {
 
   const handleEditRule = (rule: FirewallRule) => {
     setEditingRule({ ...rule });
+  };
+
+  const executeFirewalldCommand = (command: string, successMessage: string) => {
+    if (!canExecuteCommands) {
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to execute firewall commands.",
+        variant: "destructive",
+      });
+      return Promise.reject("Permission denied");
+    }
+
+    setIsRunningCommand(true);
+    setCommandOutput("");
+    
+    // Simulate backend API call to execute firewalld command
+    return new Promise<void>((resolve, reject) => {
+      setTimeout(() => {
+        // Simulate command output
+        let output = "";
+        
+        if (command.includes("--add-source")) {
+          output = `success: IP address added to firewalld\nRule successfully added\n${command}`;
+        } else if (command.includes("--remove-source")) {
+          output = `success: IP address removed from firewalld\nRule successfully removed\n${command}`;
+        } else if (command.includes("--add-port")) {
+          output = `success: Port added to firewalld\nRule successfully added\n${command}`;
+        } else if (command.includes("--reload")) {
+          output = "success: Firewall successfully reloaded";
+        } else {
+          output = `Failed to execute command: ${command}\nInvalid firewalld command`;
+          reject(output);
+          return;
+        }
+        
+        setCommandOutput(output);
+        setIsRunningCommand(false);
+        
+        toast({
+          title: "Command Executed",
+          description: successMessage,
+        });
+        
+        resolve();
+      }, 1000);
+    });
   };
 
   const handleSaveRule = () => {
@@ -88,59 +138,180 @@ export default function Firewall() {
     };
 
     const existingRuleIndex = rules.findIndex((r) => r.id === updatedRule.id);
+    const isNewRule = existingRuleIndex === -1;
 
-    if (existingRuleIndex >= 0) {
-      // Update existing rule
-      const newRules = [...rules];
-      newRules[existingRuleIndex] = updatedRule;
-      setRules(newRules);
-      toast({
-        title: "Rule Updated",
-        description: `Firewall rule for ${updatedRule.sourceIp} has been updated.`,
-      });
-    } else {
-      // Add new rule
-      setRules([...rules, updatedRule]);
-      toast({
-        title: "Rule Added",
-        description: `New firewall rule for ${updatedRule.sourceIp} has been added.`,
-      });
+    // Build firewalld command for this rule
+    let command = "";
+    let successMessage = "";
+    
+    if (updatedRule.enabled) {
+      command = `firewall-cmd --permanent --zone=public --add-source=${updatedRule.sourceIp} --add-port=${updatedRule.port}/${updatedRule.protocol}`;
+      successMessage = isNewRule 
+        ? `New firewall rule for ${updatedRule.sourceIp} has been added to firewalld.`
+        : `Firewall rule for ${updatedRule.sourceIp} has been updated in firewalld.`;
     }
 
-    setEditingRule(null);
+    // Execute firewalld command
+    if (command) {
+      executeFirewalldCommand(command, successMessage)
+        .then(() => {
+          // After successful command execution, update the UI
+          if (existingRuleIndex >= 0) {
+            // Update existing rule
+            const newRules = [...rules];
+            newRules[existingRuleIndex] = updatedRule;
+            setRules(newRules);
+          } else {
+            // Add new rule
+            setRules([...rules, updatedRule]);
+          }
+          setEditingRule(null);
+          
+          // Reload firewalld to apply changes
+          executeFirewalldCommand("firewall-cmd --reload", "Firewall rules reloaded");
+        })
+        .catch((error) => {
+          toast({
+            title: "Command Failed",
+            description: typeof error === "string" ? error : "Failed to execute firewall command",
+            variant: "destructive",
+          });
+        });
+    } else {
+      // If no command to execute (e.g., rule is disabled), just update the UI
+      if (existingRuleIndex >= 0) {
+        const newRules = [...rules];
+        newRules[existingRuleIndex] = updatedRule;
+        setRules(newRules);
+      } else {
+        setRules([...rules, updatedRule]);
+      }
+      setEditingRule(null);
+      
+      toast({
+        title: isNewRule ? "Rule Added" : "Rule Updated",
+        description: `${isNewRule ? "New firewall" : "Firewall"} rule for ${updatedRule.sourceIp} has been ${isNewRule ? "added" : "updated"}.`,
+      });
+    }
   };
 
   const handleDeleteRule = (ruleId: number) => {
-    setRules(rules.filter((rule) => rule.id !== ruleId));
-    toast({
-      title: "Rule Deleted",
-      description: "The firewall rule has been deleted.",
-    });
+    const ruleToDelete = rules.find(rule => rule.id === ruleId);
+    
+    if (!ruleToDelete) return;
+    
+    // Build firewalld command to remove the rule
+    const command = `firewall-cmd --permanent --zone=public --remove-source=${ruleToDelete.sourceIp}`;
+    const successMessage = `Firewall rule for ${ruleToDelete.sourceIp} has been removed from firewalld.`;
+    
+    executeFirewalldCommand(command, successMessage)
+      .then(() => {
+        // After successful command execution, update the UI
+        setRules(rules.filter((rule) => rule.id !== ruleId));
+        
+        // Reload firewalld to apply changes
+        executeFirewalldCommand("firewall-cmd --reload", "Firewall rules reloaded");
+      })
+      .catch((error) => {
+        toast({
+          title: "Command Failed",
+          description: typeof error === "string" ? error : "Failed to remove firewall rule",
+          variant: "destructive",
+        });
+      });
   };
 
   const handleToggleRule = (ruleId: number, enabled: boolean) => {
-    setRules(
-      rules.map((rule) =>
-        rule.id === ruleId
-          ? { ...rule, enabled, updatedAt: new Date().toISOString() }
-          : rule
-      )
-    );
+    const ruleToToggle = rules.find(rule => rule.id === ruleId);
     
-    toast({
-      title: enabled ? "Rule Enabled" : "Rule Disabled",
-      description: `The firewall rule has been ${enabled ? "enabled" : "disabled"}.`,
-    });
+    if (!ruleToToggle) return;
+    
+    // Build firewalld command based on toggle state
+    let command = "";
+    let successMessage = "";
+    
+    if (enabled) {
+      command = `firewall-cmd --permanent --zone=public --add-source=${ruleToToggle.sourceIp} --add-port=${ruleToToggle.port}/${ruleToToggle.protocol}`;
+      successMessage = `Firewall rule for ${ruleToToggle.sourceIp} has been enabled in firewalld.`;
+    } else {
+      command = `firewall-cmd --permanent --zone=public --remove-source=${ruleToToggle.sourceIp}`;
+      successMessage = `Firewall rule for ${ruleToToggle.sourceIp} has been disabled in firewalld.`;
+    }
+    
+    executeFirewalldCommand(command, successMessage)
+      .then(() => {
+        // After successful command execution, update the UI
+        setRules(
+          rules.map((rule) =>
+            rule.id === ruleId
+              ? { ...rule, enabled, updatedAt: new Date().toISOString() }
+              : rule
+          )
+        );
+        
+        // Reload firewalld to apply changes
+        executeFirewalldCommand("firewall-cmd --reload", "Firewall rules reloaded");
+      })
+      .catch((error) => {
+        toast({
+          title: "Command Failed",
+          description: typeof error === "string" ? error : `Failed to ${enabled ? 'enable' : 'disable'} firewall rule`,
+          variant: "destructive",
+        });
+      });
   };
 
   const handleToggleFirewall = (active: boolean) => {
-    setIsFirewallActive(active);
+    // Build firewalld command to enable/disable the firewall
+    const command = active 
+      ? "systemctl enable firewalld && systemctl start firewalld" 
+      : "systemctl stop firewalld && systemctl disable firewalld";
+    const successMessage = active 
+      ? "Firewall service has been enabled and started." 
+      : "Firewall service has been stopped and disabled.";
     
-    toast({
-      title: active ? "Firewall Enabled" : "Firewall Disabled",
-      description: `The firewall has been ${active ? "enabled" : "disabled"}.`,
-      variant: active ? "default" : "destructive",
-    });
+    executeFirewalldCommand(command, successMessage)
+      .then(() => {
+        // After successful command execution, update the UI
+        setIsFirewallActive(active);
+        
+        toast({
+          title: active ? "Firewall Enabled" : "Firewall Disabled",
+          description: `The firewall has been ${active ? "enabled" : "disabled"}.`,
+          variant: active ? "default" : "destructive",
+        });
+      })
+      .catch((error) => {
+        toast({
+          title: "Command Failed",
+          description: typeof error === "string" ? error : `Failed to ${active ? 'enable' : 'disable'} firewall`,
+          variant: "destructive",
+        });
+      });
+  };
+
+  const handleCustomCommand = (command: string) => {
+    // Only allow certain firewall commands
+    if (!command.startsWith("firewall-cmd") && !command.startsWith("systemctl")) {
+      toast({
+        title: "Invalid Command",
+        description: "Only firewall-cmd and systemctl firewalld commands are allowed",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    executeFirewalldCommand(command, "Custom firewall command executed")
+      .then(() => {
+        setShowCommandDialog(false);
+      })
+      .catch((error) => {
+        toast({
+          title: "Command Failed",
+          description: typeof error === "string" ? error : "Failed to execute custom command",
+          variant: "destructive",
+        });
+      });
   };
 
   const filteredRules = rules.filter(
@@ -170,6 +341,16 @@ export default function Firewall() {
               Firewall {isFirewallActive ? "Enabled" : "Disabled"}
             </Label>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowCommandDialog(true)}
+            disabled={!canExecuteCommands}
+            className="ml-2 flex items-center gap-1"
+          >
+            <Terminal className="h-4 w-4" />
+            Execute Command
+          </Button>
         </div>
       </div>
 
@@ -459,6 +640,66 @@ export default function Firewall() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={showCommandDialog} onOpenChange={setShowCommandDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Execute Firewall Command</DialogTitle>
+            <DialogDescription>
+              Enter a firewalld command to execute on the server
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="command">Command</Label>
+              <Textarea
+                id="command"
+                placeholder="firewall-cmd --permanent --zone=public --add-source=192.168.1.0/24"
+                className="font-mono"
+                rows={3}
+              />
+              <p className="text-sm text-muted-foreground">
+                <AlertTriangle className="h-4 w-4 inline mr-1" />
+                Only firewall-cmd and systemctl firewalld commands are allowed
+              </p>
+            </div>
+            {isRunningCommand && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Executing command...</span>
+              </div>
+            )}
+            {commandOutput && (
+              <div className="bg-muted p-3 rounded-md font-mono text-sm whitespace-pre-wrap">
+                {commandOutput}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCommandDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                const commandElement = document.getElementById("command") as HTMLTextAreaElement;
+                if (commandElement && commandElement.value.trim()) {
+                  handleCustomCommand(commandElement.value.trim());
+                }
+              }}
+              disabled={isRunningCommand}
+            >
+              {isRunningCommand ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  Executing...
+                </>
+              ) : (
+                "Execute Command"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
