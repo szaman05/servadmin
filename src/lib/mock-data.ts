@@ -1,4 +1,3 @@
-
 import { User, FirewallRule, ServerStats } from "@/types";
 
 // Mock users with encrypted passwords (in a real app, passwords would be hashed)
@@ -34,8 +33,6 @@ export const mockFirewallRules: FirewallRule[] = [
   {
     id: 1,
     sourceIp: "192.168.1.100",
-    port: 22,
-    protocol: "tcp",
     description: "SSH access from admin workstation",
     enabled: true,
     createdAt: "2023-08-15T10:00:00Z",
@@ -44,8 +41,6 @@ export const mockFirewallRules: FirewallRule[] = [
   {
     id: 2,
     sourceIp: "10.0.0.0/24",
-    port: 80,
-    protocol: "tcp",
     description: "HTTP access from internal network",
     enabled: true,
     createdAt: "2023-08-15T10:05:00Z",
@@ -54,8 +49,6 @@ export const mockFirewallRules: FirewallRule[] = [
   {
     id: 3,
     sourceIp: "10.0.0.0/24",
-    port: 443,
-    protocol: "tcp",
     description: "HTTPS access from internal network",
     enabled: true,
     createdAt: "2023-08-15T10:10:00Z",
@@ -64,8 +57,6 @@ export const mockFirewallRules: FirewallRule[] = [
   {
     id: 4,
     sourceIp: "203.0.113.0/24",
-    port: 3306,
-    protocol: "tcp",
     description: "MySQL access from partner network",
     enabled: false,
     createdAt: "2023-08-16T09:00:00Z",
