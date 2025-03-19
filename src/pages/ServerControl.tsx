@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Power, RefreshCw, AlertTriangle, Terminal, Clock } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
