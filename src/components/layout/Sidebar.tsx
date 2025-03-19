@@ -44,7 +44,7 @@ const SidebarItem = ({ icon: Icon, title, to, end = false, collapsed = false }: 
                 collapsed ? "justify-center" : "",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground"
               )
             }
           >
@@ -107,7 +107,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="text-sidebar-foreground hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground"
           onClick={() => setOpen(!open)}
         >
           {open ? (
@@ -135,7 +135,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
         <Button
           variant="ghost"
           className={cn(
-            "w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+            "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground",
             !open && "justify-center"
           )}
         >
