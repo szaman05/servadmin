@@ -44,24 +44,6 @@ export default function Firewall() {
   const isReadOnly = user?.role === "viewer";
   const canExecuteCommands = user?.role === "admin";
 
-  const handleAddRule = () => {
-    const newRule: FirewallRule = {
-      id: Math.max(0, ...rules.map((r) => r.id)) + 1,
-      sourceIp: "",
-      port: 22,
-      protocol: "tcp",
-      description: "",
-      enabled: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setEditingRule(newRule);
-  };
-
-  const handleEditRule = (rule: FirewallRule) => {
-    setEditingRule({ ...rule });
-  };
-
   const executeFirewalldCommand = (command: string, successMessage: string) => {
     if (!canExecuteCommands) {
       toast({
@@ -106,6 +88,24 @@ export default function Firewall() {
         resolve();
       }, 1000);
     });
+  };
+
+  const handleAddRule = () => {
+    const newRule: FirewallRule = {
+      id: Math.max(0, ...rules.map((r) => r.id)) + 1,
+      sourceIp: "",
+      port: 22,
+      protocol: "tcp",
+      description: "",
+      enabled: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setEditingRule(newRule);
+  };
+
+  const handleEditRule = (rule: FirewallRule) => {
+    setEditingRule({ ...rule });
   };
 
   const handleSaveRule = () => {
@@ -290,30 +290,6 @@ export default function Firewall() {
       });
   };
 
-  const handleCustomCommand = (command: string) => {
-    // Only allow certain firewall commands
-    if (!command.startsWith("firewall-cmd") && !command.startsWith("systemctl")) {
-      toast({
-        title: "Invalid Command",
-        description: "Only firewall-cmd and systemctl firewalld commands are allowed",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    executeFirewalldCommand(command, "Custom firewall command executed")
-      .then(() => {
-        setShowCommandDialog(false);
-      })
-      .catch((error) => {
-        toast({
-          title: "Command Failed",
-          description: typeof error === "string" ? error : "Failed to execute custom command",
-          variant: "destructive",
-        });
-      });
-  };
-
   const filteredRules = rules.filter(
     (rule) =>
       rule.sourceIp.includes(searchTerm) ||
@@ -341,16 +317,6 @@ export default function Firewall() {
               Firewall {isFirewallActive ? "Enabled" : "Disabled"}
             </Label>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowCommandDialog(true)}
-            disabled={!canExecuteCommands}
-            className="ml-2 flex items-center gap-1"
-          >
-            <Terminal className="h-4 w-4" />
-            Execute Command
-          </Button>
         </div>
       </div>
 
@@ -640,66 +606,6 @@ export default function Firewall() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      <Dialog open={showCommandDialog} onOpenChange={setShowCommandDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Execute Firewall Command</DialogTitle>
-            <DialogDescription>
-              Enter a firewalld command to execute on the server
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="command">Command</Label>
-              <Textarea
-                id="command"
-                placeholder="firewall-cmd --permanent --zone=public --add-source=192.168.1.0/24"
-                className="font-mono"
-                rows={3}
-              />
-              <p className="text-sm text-muted-foreground">
-                <AlertTriangle className="h-4 w-4 inline mr-1" />
-                Only firewall-cmd and systemctl firewalld commands are allowed
-              </p>
-            </div>
-            {isRunningCommand && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                <span>Executing command...</span>
-              </div>
-            )}
-            {commandOutput && (
-              <div className="bg-muted p-3 rounded-md font-mono text-sm whitespace-pre-wrap">
-                {commandOutput}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCommandDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={() => {
-                const commandElement = document.getElementById("command") as HTMLTextAreaElement;
-                if (commandElement && commandElement.value.trim()) {
-                  handleCustomCommand(commandElement.value.trim());
-                }
-              }}
-              disabled={isRunningCommand}
-            >
-              {isRunningCommand ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                  Executing...
-                </>
-              ) : (
-                "Execute Command"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </DashboardLayout>
   );
 }
