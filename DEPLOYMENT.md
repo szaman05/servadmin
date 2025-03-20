@@ -102,7 +102,7 @@ This application is compatible with MySQL 5.7. If you're using a different MySQL
 
 1. **Character Set**: The database uses `utf8mb4` with `utf8mb4_unicode_ci` collation for full Unicode support.
 
-2. **Timestamp Columns**: The schema uses the `TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` format which is compatible with MySQL 5.7.
+2. **Timestamp Columns**: The schema uses only one TIMESTAMP column with CURRENT_TIMESTAMP per table (usually the created_at column). The updated_at column uses DATETIME type with ON UPDATE CURRENT_TIMESTAMP to avoid the MySQL 5.7 limitation.
 
 3. **If using MySQL 5.7 from official repositories**:
    ```bash
@@ -134,7 +134,7 @@ CREATE TABLE users (
   email VARCHAR(100) UNIQUE NOT NULL,
   last_login DATETIME,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 ```
 
@@ -148,7 +148,7 @@ CREATE TABLE firewall_rules (
   enabled BOOLEAN DEFAULT TRUE,
   created_by INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 ```
@@ -191,7 +191,7 @@ CREATE TABLE servers (
   description TEXT,
   status ENUM('running', 'stopped', 'restarting', 'unknown') DEFAULT 'unknown',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 ```
 
