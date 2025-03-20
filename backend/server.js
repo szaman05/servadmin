@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
@@ -11,6 +10,7 @@ const { promisify } = require('util');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
+const fetch = require('node-fetch');
 
 // Load environment variables
 dotenv.config();
@@ -38,7 +38,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../dist')));
 
-// Create MySQL connection pool
+// Create MySQL connection pool compatible with MySQL 5.7
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
@@ -47,7 +47,8 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  charset: 'utf8mb4'
 });
 
 // Auth middleware

@@ -1,7 +1,7 @@
 
 # ServAdmin Deployment Guide
 
-This guide will walk you through deploying the ServAdmin application on a CentOS 7 server.
+This guide will walk you through deploying the ServAdmin application on a CentOS 7 server with MySQL 5.7.
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ cd servadmin
 ### 2. Run the Deployment Script
 
 The deployment script will:
-- Install required packages (Node.js, MariaDB, Apache HTTP Server)
+- Install required packages (Node.js, MariaDB/MySQL, Apache HTTP Server)
 - Set up the database with the schema
 - Configure the backend with environment variables
 - Build and deploy the frontend
@@ -96,9 +96,32 @@ If you need to manually configure Apache, the configuration is located at:
 /etc/httpd/conf.d/servadmin.conf
 ```
 
+## MySQL 5.7 Compatibility
+
+This application is compatible with MySQL 5.7. If you're using a different MySQL version (like MariaDB), the deployment should still work, but for MySQL 5.7 specifically:
+
+1. **Character Set**: The database uses `utf8mb4` with `utf8mb4_unicode_ci` collation for full Unicode support.
+
+2. **Timestamp Columns**: The schema uses the `TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` format which is compatible with MySQL 5.7.
+
+3. **If using MySQL 5.7 from official repositories**:
+   ```bash
+   # Replace MariaDB with MySQL 5.7
+   sudo yum remove mariadb mariadb-server
+   sudo yum install https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm
+   sudo yum install mysql-community-server
+   sudo systemctl start mysqld
+   
+   # Get the temporary root password
+   sudo grep 'temporary password' /var/log/mysqld.log
+   
+   # Secure the installation
+   sudo mysql_secure_installation
+   ```
+
 ## Database Schema
 
-The application uses a MySQL/MariaDB database with the following schema:
+The application uses a MySQL 5.7 compatible database with the following schema:
 
 ### Users Table
 Stores user accounts and authentication information.
@@ -202,6 +225,18 @@ Verify database credentials:
 mysql -u servadmin -p servadmin
 ```
 
+If using MySQL 5.7, check for any authentication plugin issues:
+```bash
+mysql -u root -p
+SELECT user, host, plugin FROM mysql.user WHERE user='servadmin';
+```
+
+If the plugin is 'auth_socket', update it:
+```sql
+ALTER USER 'servadmin'@'localhost' IDENTIFIED WITH mysql_native_password BY 'your_password';
+FLUSH PRIVILEGES;
+```
+
 ### Firewall Rules Not Applied
 Check firewalld status:
 ```bash
@@ -219,6 +254,11 @@ sudo systemctl restart firewalld
 Regular backups of the database are essential:
 ```bash
 mysqldump -u root -p servadmin > /backup/servadmin_$(date +%Y%m%d).sql
+```
+
+For MySQL 5.7 specific options:
+```bash
+mysqldump --single-transaction --quick --lock-tables=false -u root -p servadmin > /backup/servadmin_$(date +%Y%m%d).sql
 ```
 
 ### Updating

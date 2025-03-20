@@ -1,5 +1,5 @@
 
--- ServAdmin Database Schema
+-- ServAdmin Database Schema (MySQL 5.7 compatible)
 
 -- Users Table
 CREATE TABLE users (
