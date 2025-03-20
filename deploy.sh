@@ -28,7 +28,7 @@ mkdir -p $FRONTEND_DIR
 echo "Installing system dependencies..."
 yum update -y
 yum install -y epel-release
-yum install -y nodejs npm mariadb mariadb-server nginx firewalld git
+yum install -y nodejs npm mariadb mariadb-server httpd firewalld git
 
 # Configure and start MariaDB
 echo "Configuring MariaDB..."
@@ -75,39 +75,71 @@ echo "Building frontend..."
 npm run build
 cp -r dist/* $FRONTEND_DIR/
 
-# Configure Nginx
-echo "Configuring Nginx..."
-cat > /etc/nginx/conf.d/servadmin.conf << EOF
-server {
-    listen 80;
-    server_name _;
-
-    root $FRONTEND_DIR;
-    index index.html;
-
-    location / {
-        try_files \$uri \$uri/ /index.html;
-    }
-
-    location /api {
-        proxy_pass http://localhost:3001/api;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
-    }
-
-    location /socket.io {
-        proxy_pass http://localhost:3001/socket.io;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
-    }
-}
+# Configure Apache
+echo "Configuring Apache HTTP Server..."
+cat > /etc/httpd/conf.d/servadmin.conf << EOF
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    DocumentRoot $FRONTEND_DIR
+    
+    <Directory $FRONTEND_DIR>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+    
+    # Backend API Proxy
+    ProxyRequests Off
+    ProxyPreserveHost On
+    
+    <Location /api>
+        ProxyPass http://localhost:3001/api
+        ProxyPassReverse http://localhost:3001/api
+    </Location>
+    
+    # WebSocket Proxy
+    <Location /socket.io>
+        ProxyPass http://localhost:3001/socket.io
+        ProxyPassReverse http://localhost:3001/socket.io
+        
+        # WebSocket support
+        RewriteEngine On
+        RewriteCond %{HTTP:Upgrade} =websocket [NC]
+        RewriteRule /(.*) ws://localhost:3001/$1 [P,L]
+    </Location>
+    
+    ErrorLog /var/log/httpd/servadmin_error.log
+    CustomLog /var/log/httpd/servadmin_access.log combined
+</VirtualHost>
 EOF
+
+# Create .htaccess for SPA routing
+echo "Creating .htaccess for SPA routing..."
+cat > $FRONTEND_DIR/.htaccess << EOF
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+EOF
+
+# Enable required Apache modules
+echo "Enabling required Apache modules..."
+# Check if mod_proxy is installed
+if [ -f /etc/httpd/modules/mod_proxy.so ]; then
+    # Enable modules
+    cat > /etc/httpd/conf.modules.d/00-proxy.conf << EOF
+LoadModule proxy_module modules/mod_proxy.so
+LoadModule proxy_http_module modules/mod_proxy_http.so
+LoadModule proxy_wstunnel_module modules/mod_proxy_wstunnel.so
+LoadModule rewrite_module modules/mod_rewrite.so
+EOF
+else
+    echo "WARNING: Required Apache modules might not be available. Please ensure mod_proxy, mod_proxy_http, mod_proxy_wstunnel, and mod_rewrite are installed."
+fi
 
 # Create systemd service for backend
 echo "Creating backend service..."
@@ -138,8 +170,8 @@ firewall-cmd --reload
 
 # Enable and start services
 echo "Starting services..."
-systemctl enable nginx
-systemctl restart nginx
+systemctl enable httpd
+systemctl start httpd
 systemctl enable servadmin
 systemctl start servadmin
 

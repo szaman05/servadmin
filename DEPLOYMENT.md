@@ -24,7 +24,7 @@ cd servadmin
 ### 2. Run the Deployment Script
 
 The deployment script will:
-- Install required packages (Node.js, MariaDB, Nginx)
+- Install required packages (Node.js, MariaDB, Apache HTTP Server)
 - Set up the database with the schema
 - Configure the backend with environment variables
 - Build and deploy the frontend
@@ -61,8 +61,8 @@ For production use, complete these additional security steps:
 
 2. **Set up HTTPS**:
    ```bash
-   sudo yum install -y certbot python-certbot-nginx
-   sudo certbot --nginx -d yourdomain.com
+   sudo yum install -y certbot python-certbot-apache
+   sudo certbot --apache -d yourdomain.com
    ```
 
 3. **Secure the database**:
@@ -75,6 +75,26 @@ For production use, complete these additional security steps:
    # Add to crontab (run 'crontab -e')
    0 2 * * * mysqldump -u root -p servadmin > /backup/servadmin_$(date +\%Y\%m\%d).sql
    ```
+
+## Apache Configuration
+
+The deployment script configures Apache with the following features:
+
+1. **Static file serving** - Serves the React frontend from `/opt/servadmin/frontend`
+2. **API proxying** - Forwards `/api` requests to the Node.js backend
+3. **WebSocket support** - Configures proper WebSocket proxying for real-time features
+4. **SPA routing** - Uses .htaccess with mod_rewrite to support client-side routing
+
+Apache modules required:
+- mod_proxy
+- mod_proxy_http
+- mod_proxy_wstunnel
+- mod_rewrite
+
+If you need to manually configure Apache, the configuration is located at:
+```
+/etc/httpd/conf.d/servadmin.conf
+```
 
 ## Database Schema
 
@@ -163,6 +183,17 @@ sudo systemctl status servadmin
 View logs:
 ```bash
 sudo journalctl -u servadmin
+```
+
+### Apache Issues
+Check Apache configuration:
+```bash
+sudo apachectl configtest
+```
+
+View Apache error logs:
+```bash
+sudo tail -f /var/log/httpd/servadmin_error.log
 ```
 
 ### Database Connection Issues
