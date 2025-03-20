@@ -10,12 +10,15 @@ import {
   Server,
   ChevronLeft,
   ChevronRight,
-  LogOut
+  LogOut,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AllowMyIpButton } from "@/components/firewall/AllowMyIpButton";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SidebarProps {
   open: boolean;
@@ -59,6 +62,8 @@ const SidebarItem = ({ icon: Icon, title, to, end = false, collapsed = false }: 
 };
 
 export function Sidebar({ open, setOpen }: SidebarProps) {
+  const { logout, user } = useAuth();
+  
   const sidebarItems = [
     {
       title: "Dashboard",
@@ -72,14 +77,19 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
       to: "/firewall",
     },
     {
-      title: "Users",
-      icon: Users,
-      to: "/users",
-    },
-    {
       title: "Server Control",
       icon: Server,
       to: "/server-control",
+    },
+    {
+      title: "Logs",
+      icon: FileText,
+      to: "/logs",
+    },
+    {
+      title: "Users",
+      icon: Users,
+      to: "/users",
     },
     {
       title: "Settings",
@@ -131,13 +141,19 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
           ))}
         </nav>
       </ScrollArea>
-      <div className="border-t border-sidebar-border p-4">
+      <div className="border-t border-sidebar-border p-4 space-y-2">
+        {open ? (
+          <div className="mb-2">
+            <AllowMyIpButton />
+          </div>
+        ) : null}
         <Button
           variant="ghost"
           className={cn(
             "w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground",
             !open && "justify-center"
           )}
+          onClick={logout}
         >
           <LogOut className="h-5 w-5 mr-2" />
           {open && "Logout"}

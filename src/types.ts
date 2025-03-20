@@ -3,7 +3,7 @@
 export interface User {
   id: number;
   username: string;
-  password: string; // In a real app, this would be a hash
+  password?: string; // Only used for login, not stored in state
   role: "admin" | "operator" | "viewer";
   email: string;
   lastLogin: string;
@@ -17,6 +17,18 @@ export interface FirewallRule {
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+  createdBy?: number;
+  createdByUsername?: string;
+}
+
+// Temporary IP access (for "Allow My IP" feature)
+export interface TemporaryIpAccess {
+  id: number;
+  userId: number;
+  ipAddress: string;
+  description: string;
+  expiresAt: string;
+  createdAt: string;
 }
 
 // Server statistics
@@ -55,10 +67,48 @@ export interface ServerStats {
   load: number[];
 }
 
+// Server logs
+export interface ServerLog {
+  id: number;
+  serverId: number;
+  logType: "info" | "warning" | "error" | "critical";
+  message: string;
+  createdAt: string;
+}
+
 // Auth context
 export interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  token: string | null;
+}
+
+// API response types
+export interface ApiResponse<T> {
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+export interface LoginResponse {
+  user: User;
+  token: string;
+}
+
+export interface AllowMyIpResponse {
+  id: number;
+  ip_address: string;
+  description: string;
+  expires_at: string;
+  message: string;
+}
+
+export interface ServiceControlResponse {
+  action: string;
+  service: string;
+  stdout: string;
+  stderr: string;
+  timestamp: string;
 }
